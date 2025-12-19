@@ -14,7 +14,10 @@ import librosa
 import numpy as np
 import torch
 import torchvision.transforms as transforms
-from decord import VideoReader
+try:
+    from decord import VideoReader
+except ImportError:
+    VideoReader = None
 from einops import rearrange
 from func_timeout import FunctionTimedOut, func_timeout
 from PIL import Image
