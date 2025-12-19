@@ -191,9 +191,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
             all_x_embedder[f"{patch_size}-{f_patch_size}"] = x_embedder
 
         self.control_all_x_embedder = nn.ModuleDict(all_x_embedder)
-        self.add_control_noise_refiner = add_control_noise_refiner
-        self.add_control_noise_refiner_correctly = add_control_noise_refiner_correctly
-        if self.add_control_noise_refiner:
+        if self.config.add_control_noise_refiner:
             del self.noise_refiner
             self.noise_refiner = nn.ModuleList(
                 [
@@ -385,7 +383,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
         )
         new_kwargs.update(kwargs)
         
-        local_layers =  self.control_noise_refiner if self.add_control_noise_refiner_correctly else self.control_layers
+        local_layers =  self.control_noise_refiner if self.config.add_control_noise_refiner_correctly else self.control_layers
         for layer in local_layers:
             if torch.is_grad_enabled() and self.gradient_checkpointing:
                 def create_custom_forward(module, **static_kwargs):
@@ -497,7 +495,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
         for i, seq_len in enumerate(x_item_seqlens):
             x_attn_mask[i, :seq_len] = 1
 
-        if self.add_control_noise_refiner:
+        if self.config.add_control_noise_refiner:
             kwargs = dict(
                 attn_mask=x_attn_mask,
                 freqs_cis=x_freqs_cis, 
@@ -514,7 +512,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
                 freqs_cis=x_freqs_cis, 
                 adaln_input=adaln_input,
             )
-            if self.add_control_noise_refiner:
+            if self.config.add_control_noise_refiner:
                 kwargs["hints"] = refiner_hints
                 kwargs["context_scale"] = control_context_scale
 
@@ -608,7 +606,7 @@ class ZImageControlTransformer2DModel(ZImageTransformer2DModel):
             freqs_cis=unified_freqs_cis, 
             adaln_input=adaln_input,
         )
-        if self.add_control_noise_refiner:
+        if self.config.add_control_noise_refiner:
             hints = self.forward_control_2_0_layers(
                 unified, cap_feats, control_context, control_context_item_seqlens, kwargs, 
             )

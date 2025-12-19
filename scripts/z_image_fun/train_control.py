@@ -666,6 +666,11 @@ def parse_args():
         default=1.29,
         help="Scale of mode weighting scheme. Only effective when using the `'mode'` as the `weighting_scheme`.",
     )
+    parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="Whether to compile the model.",
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -760,6 +765,15 @@ def main():
         transformers.utils.logging.set_verbosity_error()
         diffusers.utils.logging.set_verbosity_error()
 
+    # Enable cudnn benchmark for speed optimization
+    torch.backends.cudnn.benchmark = True
+    # Set matmul precision to high for potential speedup
+    try:
+        torch.set_float32_matmul_precision('high')
+    except AttributeError:
+        # torch version might be too old
+        pass
+
     # If passed along, set the training seed now.
     if args.seed is not None:
         set_seed(args.seed)
@@ -841,6 +855,9 @@ def main():
         low_cpu_mem_usage=True,
         transformer_additional_kwargs=OmegaConf.to_container(config['transformer_additional_kwargs']),
     ).to(weight_dtype)
+
+    if args.compile:
+        transformer3d = torch.compile(transformer3d)
 
     # Freeze vae and text_encoder and set transformer3d to trainable
     vae.requires_grad_(False)
@@ -1570,7 +1587,7 @@ def main():
                 timesteps = (1000 - timesteps) / 1000
 
                 # Predict the noise residual
-                with torch.cuda.amp.autocast(dtype=weight_dtype), torch.cuda.device(device=accelerator.device):
+                with torch.amp.autocast('cuda', dtype=weight_dtype), torch.cuda.device(device=accelerator.device):
                     noise_pred = transformer3d(
                         x=noisy_latents,
                         t=timesteps,
